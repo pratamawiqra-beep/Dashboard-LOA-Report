@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bardahl LOA Report</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { 
+      --bg-gambar-utama: url('https://i.ibb.co.com/5XFLf8G4/IMG-4981-JPG.jpg');
+      --bardahl-yellow: #FFEA00; 
+      --bardahl-black: #111111; 
+      --bardahl-gray: #f4f6f9; 
+    }
+
+    body { background-color: var(--bardahl-gray); font-family: 'Helvetica Neue Bold', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+    
+    #loadingOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: white; z-index: 99999; display: flex;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .spinner {
+      width: 50px; height: 50px; border: 5px solid var(--bardahl-gray);
+      border-top: 5px solid var(--bardahl-black); border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .glass-navbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 70px;
+      background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 40px; z-index: 9999; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Tombol Rahasia di Logo */
+    .nav-brand { color: var(--bardahl-yellow); font-weight: 900; font-size: 1.3rem; letter-spacing: 1px; cursor: pointer; user-select: none; }
+    
+    .nav-menu { display: flex; gap: 8px; align-items: center;}
+    .nav-btn {
+      background: transparent; border: none; color: #ccc;
+      font-size: 0.95rem; font-weight: 700; padding: 8px 18px;
+      cursor: pointer; border-radius: 6px; transition: all 0.3s ease;
+    }
+    .nav-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+    .nav-btn.active { color: #111; background: var(--bardahl-yellow); box-shadow: 0 2px 15px rgba(255, 234, 0, 0.3); }
+
+    .header-panel {
+      background: radial-gradient(circle at center 45%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.1) 25%, rgba(0, 0, 0, 0.85) 90%), var(--bg-gambar-utama);
+      background-size: cover; background-position: center center;
+      height: 380px; display: flex; align-items: flex-end; justify-content: center;
+      margin-bottom: 25px; border-bottom: 8px solid var(--bardahl-yellow); 
+      box-shadow: 0 6px 15px rgba(0,0,0,0.25); padding-bottom: 30px;
+    }
+    .brand-title { 
+      font-size: 45px; font-weight: 900; letter-spacing: 3px; 
+      text-transform: uppercase; margin-bottom: 0px; 
+      color: rgba(255, 255, 255, 0.95); text-shadow: 2px 2px 15px rgba(0,0,0,0.8); 
+    }
+
+    .view-section { display: none; animation: fadeIn 0.4s ease forwards; }
+    .view-section.active { display: block; } 
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card-kpi { border-radius: 12px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; }
+    .card-kpi:hover { transform: translateY(-3px); }
+    
+    .table-container { background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 20px; }
+    .table-responsive { max-height: 500px; overflow-y: auto; }
+    .table thead th { position: sticky; top: 0; z-index: 10; background-color: #212529 !important; color: #fff; }
+
+    .sidebar-filter { background: #ffffff; border-radius: 12px; padding: 20px; border: 1px solid #e9ecef; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    .checklist-box { max-height: 180px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; background-color: #f8f9fa; }
+    .checklist-box::-webkit-scrollbar { width: 6px; }
+    .checklist-box::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    .form-check-label { font-size: 12px; font-weight: 700; color: #495057; cursor: pointer; }
+
+    /* CSS PINTAR UNTUK MODE SALES & TECHNICAL */
+    .mode-sales .tech-only { display: none !important; }
+    body:not(.mode-sales) .sales-only { display: none !important; }
+  </style>
+</head>
+<body class="mode-sales">
+
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <h5 class="fw-bold text-dark">Loading System Data...</h5>
+  </div>
+
+  <nav class="glass-navbar">
+    <!-- TOMBOL RAHASIA DI LOGO BARDAHL -->
+    <div class="nav-brand" onclick="toggleAppMode()" title="System Mode">BARDAHL</div>
+    
+    <div class="nav-menu" id="navMenuContainer">
+      <button class="nav-btn active" onclick="switchMenu('menu-dashboard', this)">Home</button>
+      <button class="nav-btn tech-only" onclick="switchMenu('menu-datasampel', this)">Sample Data</button>
+      <button class="nav-btn tech-only" onclick="switchMenu('menu-parameter', this)">Lab Parameters</button>
+    </div>
+  </nav>
+
+  <div class="header-panel text-center">
+    <div class="container">
+      <h1 class="brand-title">BARDAHL LOA REPORT</h1>
+    </div>
+  </div>
+
+  <div class="container-fluid px-5 mb-5">
+
+    <!-- ========================================================= -->
+    <!-- 1. MENU HOME (DASHBOARD UTAMA) -->
+    <!-- ========================================================= -->
+    <div id="menu-dashboard" class="view-section active">
+      
+      <!-- CONTROLS TEKNIKAL: RADIO BUTTON LAB (HANYA MUNCUL DI TEKNIKAL) -->
+      <div class="text-center mb-4 tech-only">
+        <div class="btn-group shadow-sm bg-white rounded-3 p-1" role="group">
+          <input type="radio" class="btn-check" name="labRadioHome" id="homeLabAll" autocomplete="off" checked onchange="updateHomeView()">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="homeLabAll">All</label>
+          <input type="radio" class="btn-check" name="labRadioHome" id="homeLabTeko" autocomplete="off" onchange="updateHomeView()">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="homeLabTeko">Tekenomiks</label>
+          <input type="radio" class="btn-check" name="labRadioHome" id="homeLabPetro" autocomplete="off" onchange="updateHomeView()">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="homeLabPetro">Petrolab</label>
+        </div>
+      </div>
+
+      <!-- CONTROLS SALES: DROPDOWN LAB & DROPDOWN PT (HANYA MUNCUL DI SALES) -->
+      <div class="row justify-content-center mb-4 sales-only g-4">
+        <div class="col-md-4">
+          <label class="form-label fw-bold text-secondary small text-center w-100">LABORATORIUM PENGUJI</label>
+          <select id="homeSalesFilterLab" class="form-select form-select-lg text-center shadow-sm fw-bold text-dark border-secondary" onchange="updateHomeView()">
+            <option value="All">All Lab</option>
+            <option value="Tekenomiks">Tekenomiks</option>
+            <option value="Petrolab">Petrolab</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label fw-bold text-secondary small text-center w-100">DAFTAR PERUSAHAAN (TRUSTED BY)</label>
+          <select id="homeSalesFilterCustomer" class="form-select form-select-lg text-center shadow-sm fw-bold text-dark border-secondary" onchange="updateHomeView()">
+            <!-- Akan diisi otomatis oleh JS -->
+          </select>
+        </div>
+      </div>
+
+      <!-- ROW KPI SALES -->
+      <div class="row text-center g-3 mb-4 sales-only">
+        <div class="col-md-4">
+          <div class="card card-kpi bg-white p-3 border-0 shadow-sm" style="border-bottom: 4px solid #111;">
+            <span class="text-muted small fw-bold">TOTAL SAMPLE UJI LAB</span>
+            <h2 id="homeSalesKpiTotal" class="fw-bold text-dark mt-2 mb-0">0</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card card-kpi bg-white p-3 border-0 shadow-sm" style="border-bottom: 4px solid #198754;">
+            <span class="text-muted small fw-bold">TRUSTED BY (PERUSAHAAN)</span>
+            <h2 id="homeSalesKpiCompanies" class="fw-bold text-success mt-2 mb-0">0</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card card-kpi bg-white p-3 border-0 shadow-sm" style="border-bottom: 4px solid #2b6cb0;">
+            <span class="text-muted small fw-bold">TOTAL INVESTASI UJI LAB</span>
+            <h2 id="homeSalesTotalCost" class="fw-bold text-primary mt-2 mb-0">Rp 0</h2>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW KPI TEKNIS (HANYA MUNCUL DI MODE TEKNISI) -->
+      <div class="row text-center g-3 mb-4 tech-only">
+        <div class="col-md-3"><div class="card card-kpi bg-white p-3"><span class="text-muted small fw-bold">TOTAL SAMPLE</span><h2 id="homeKpiTotal" class="fw-bold text-dark mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-success text-white p-3"><span class="small fw-bold">NORMAL</span><h2 id="homeKpiNormal" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-warning text-dark p-3"><span class="small fw-bold">WATCH</span><h2 id="homeKpiWatch" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-danger text-white p-3"><span class="small fw-bold">PROBLEM</span><h2 id="homeKpiProblem" class="fw-bold mt-2">0</h2></div></div>
+      </div>
+
+      <!-- KOTAK BIAYA TEKNIS -->
+      <div class="row mb-4 tech-only" id="homeCostContainer">
+        <div class="col-12">
+          <div class="card bg-white p-3 border-0 shadow-sm rounded-4" style="border-left: 5px solid #2b6cb0 !important;">
+            <span class="text-muted small fw-bold text-uppercase">Total Estimated Cost</span>
+            <h2 id="homeTotalCostCard" class="fw-bold text-primary mt-1 mb-0">Rp 0</h2>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAFIK BAR KERUSAKAN (HANYA MUNCUL DI MODE TEKNISI) -->
+      <div class="card border-0 shadow-sm mb-4 p-4 rounded-4 bg-white tech-only">
+        <h5 class="fw-bold mb-4 text-dark text-center">Comparison of Sample Status</h5>
+        <div class="row align-items-center">
+          <div class="col-md-8"><div style="position: relative; height: 320px; width: 100%;"><canvas id="homeBarChart"></canvas></div></div>
+          <div class="col-md-4">
+            <div class="d-flex flex-column gap-3">
+              <div class="p-3 rounded-3" style="background-color: rgba(25, 135, 84, 0.1); border-left: 6px solid #198754;">
+                <h6 class="fw-bold text-success mb-1">NORMAL</h6>
+                <div class="d-flex justify-content-between align-items-end"><h2 id="pctNormal" class="fw-bold mb-0 text-dark">0%</h2><span id="countNormal" class="text-muted small fw-bold">0 Unit</span></div>
+              </div>
+              <div class="p-3 rounded-3" style="background-color: rgba(255, 193, 7, 0.15); border-left: 6px solid #ffc107;">
+                <h6 class="fw-bold mb-1" style="color: #d39e00;">WATCH</h6>
+                <div class="d-flex justify-content-between align-items-end"><h2 id="pctWatch" class="fw-bold mb-0 text-dark">0%</h2><span id="countWatch" class="text-muted small fw-bold">0 Unit</span></div>
+              </div>
+              <div class="p-3 rounded-3" style="background-color: rgba(220, 53, 69, 0.1); border-left: 6px solid #dc3545;">
+                <h6 class="fw-bold text-danger mb-1">PROBLEM</h6>
+                <div class="d-flex justify-content-between align-items-end"><h2 id="pctProblem" class="fw-bold mb-0 text-dark">0%</h2><span id="countProblem" class="text-muted small fw-bold">0 Unit</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABEL HOME -->
+      <div class="table-container mb-4">
+        <h5 class="fw-bold mb-3 text-dark">Population Details</h5>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" style="font-size: 14px;">
+            <thead class="table-dark">
+              <tr>
+                <th>Customer</th>
+                <th>Registration Number</th>
+                <th>Machine ID</th>
+                <th>Unit (Series)</th>
+                <th>Compartment</th>
+                <th>Lube Name</th>
+                <th>Lab Source</th>
+                <th class="tech-only">Lab Status</th>
+              </tr>
+            </thead>
+            <tbody id="homeDataTableBody">
+              <tr><td colspan="8" class="text-center text-muted py-4">Loading data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div> 
+
+    <!-- ========================================================= -->
+    <!-- 2. MENU DATA SAMPEL (HANYA TEKNISI) -->
+    <!-- ========================================================= -->
+    <div id="menu-datasampel" class="view-section">
+      <div class="text-center mb-3">
+        <div class="btn-group shadow-sm bg-white rounded-3 p-1" role="group">
+          <input type="radio" class="btn-check" name="labRadioSampel" id="sampelLabTeko" autocomplete="off" checked onchange="updateSampelView()">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="sampelLabTeko">Tekenomiks</label>
+          <input type="radio" class="btn-check" name="labRadioSampel" id="sampelLabPetro" autocomplete="off" onchange="updateSampelView()">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="sampelLabPetro">Petrolab</label>
+        </div>
+      </div>
+
+      <div class="row text-center g-3 mb-4">
+        <div class="col-md-3"><div class="card card-kpi bg-white p-3"><span class="text-muted small fw-bold">TOTAL SAMPLE</span><h2 id="sampelKpiTotal" class="fw-bold text-dark mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-success text-white p-3"><span class="small fw-bold">NORMAL</span><h2 id="sampelKpiNormal" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-warning text-dark p-3"><span class="small fw-bold">WATCH</span><h2 id="sampelKpiWatch" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-danger text-white p-3"><span class="small fw-bold">PROBLEM</span><h2 id="sampelKpiProblem" class="fw-bold mt-2">0</h2></div></div>
+      </div>
+
+      <div class="row mb-4" id="sampelCostContainer">
+        <div class="col-12">
+          <div class="card bg-white p-3 border-0 shadow-sm rounded-4" style="border-left: 5px solid #2b6cb0 !important;">
+            <span class="text-muted small fw-bold text-uppercase">Total Estimated Cost</span>
+            <h2 id="sampelTotalCostCard" class="fw-bold text-primary mt-1 mb-0">Rp 0</h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm p-3 mb-4 rounded-4 bg-white">
+        <h6 class="fw-bold text-dark mb-3">Filter Sample Data</h6>
+        <div class="row g-3">
+          <div class="col-md-3"><label class="form-label fw-bold text-secondary small">COMPANY</label><select id="sampelFilterCustomer" class="form-select" onchange="updateSampelView()"></select></div>
+          <div class="col-md-3"><label class="form-label fw-bold text-secondary small">UNIT / SERIES</label><select id="sampelFilterSeries" class="form-select" onchange="updateSampelView()"></select></div>
+          <div class="col-md-3"><label class="form-label fw-bold text-secondary small">COMPARTMENT</label><select id="sampelFilterCompartment" class="form-select" onchange="updateSampelView()"></select></div>
+          <div class="col-md-3"><label class="form-label fw-bold text-secondary small">YEAR</label><select id="sampelFilterYear" class="form-select" onchange="updateSampelView()"></select></div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4 p-4 rounded-4 bg-white">
+        <h5 class="fw-bold mb-3 text-dark">Data Status Trends</h5>
+        <div style="position: relative; height: 350px; width: 100%;"><canvas id="sampelLineChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 3. MENU LAB PARAMETERS (HANYA TEKNISI) -->
+    <!-- ========================================================= -->
+    <div id="menu-parameter" class="view-section">
+      <div class="text-center mb-4">
+        <div class="btn-group shadow-sm bg-white rounded-3 p-1" role="group">
+          <input type="radio" class="btn-check" name="labRadioParam" id="paramLabTeko" autocomplete="off" checked onchange="updateParamView(true)">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="paramLabTeko">Tekenomiks</label>
+          <input type="radio" class="btn-check" name="labRadioParam" id="paramLabPetro" autocomplete="off" onchange="updateParamView(true)">
+          <label class="btn btn-outline-dark px-4 fw-bold" for="paramLabPetro">Petrolab</label>
+        </div>
+      </div>
+      
+      <div class="row text-center g-3 mb-4">
+        <div class="col-md-3"><div class="card card-kpi bg-white p-3"><span class="text-muted small fw-bold">TOTAL SAMPLE</span><h2 id="paramKpiTotal" class="fw-bold text-dark mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-success text-white p-3"><span class="small fw-bold">NORMAL</span><h2 id="paramKpiNormal" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-warning text-dark p-3"><span class="small fw-bold">WATCH</span><h2 id="paramKpiWatch" class="fw-bold mt-2">0</h2></div></div>
+        <div class="col-md-3"><div class="card card-kpi bg-danger text-white p-3"><span class="small fw-bold">PROBLEM</span><h2 id="paramKpiProblem" class="fw-bold mt-2">0</h2></div></div>
+      </div>
+
+      <div class="row mb-4 align-items-stretch">
+        <div class="col-md-3">
+          <div class="sidebar-filter h-100">
+            <h6 class="fw-bold text-dark mb-3 text-center border-bottom pb-2">Filter & Comparison</h6>
+            <label class="form-label fw-bold text-secondary small mb-1">COMPANY</label>
+            <select id="paramFilterCustomer" class="form-select form-select-sm mb-2" onchange="updateParamView(true)"></select>
+
+            <label class="form-label fw-bold text-secondary small mb-1">COMPARTMENT</label>
+            <select id="paramFilterCompartment" class="form-select form-select-sm mb-2" onchange="updateParamView(true)"></select>
+            
+            <label class="form-label fw-bold text-secondary small mb-1">YEAR</label>
+            <select id="paramFilterYear" class="form-select form-select-sm mb-3" onchange="updateParamView(true)"></select>
+
+            <hr class="text-muted my-2">
+
+            <label class="form-label fw-bold text-secondary small mb-1 mt-2">SELECT UNIT / SERIES</label>
+            <div id="paramCheckboxSeries" class="checklist-box mb-3"></div>
+
+            <label class="form-label fw-bold text-secondary small mb-1">SELECT TEST PARAMETERS</label>
+            <div id="paramTestChecklist" class="checklist-box">
+              <!-- Render otomatis via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-9">
+          <div class="card border-0 shadow-sm p-4 h-100 rounded-4 bg-white d-flex flex-column">
+            <div style="position: relative; flex-grow: 1; min-height: 450px; width: 100%;"><canvas id="paramLineChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div> 
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    let allData = [];
+    let homeBarChartObj = null;
+    let sampelLineChartObj = null;
+    let paramLineChartObj = null;
+    
+    let currentAppMode = 'SALES';
+
+    // FUNGSI SAKLAR RAHASIA (Ganti Mode)
+    function toggleAppMode() {
+      if (currentAppMode === 'SALES') {
+        let pin = prompt("Masukkan PIN rahasia Teknisi:");
+        if (pin === "1234") { 
+          currentAppMode = 'TECHNICAL';
+          document.body.classList.remove('mode-sales');
+          alert("Akses Teknisi Terbuka. Seluruh data masalah dan menu Lab telah ditampilkan.");
+          
+          // Reset Home filter agar mulus ke teknikal
+          document.getElementById('homeLabAll').checked = true;
+          updateHomeView();
+        } else {
+          if(pin !== null) alert("PIN Salah! Akses ditolak.");
+        }
+      } else {
+        currentAppMode = 'SALES';
+        document.body.classList.add('mode-sales');
+        
+        // Paksa kembali ke Menu Home & Reset dropdown Lab ke All
+        document.getElementById('homeSalesFilterLab').value = 'All';
+        let btnHome = document.querySelector('button[onclick="switchMenu(\'menu-dashboard\', this)"]');
+        switchMenu('menu-dashboard', btnHome);
+        
+        alert("Mode Sales Aktif. Tampilan kembali ke presentasi Customer.");
+      }
+    }
+
+    function switchMenu(targetId, btnElement) {
+      document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+      document.getElementById(targetId).classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      
+      btnElement.classList.add('active');
+
+      if (targetId === 'menu-dashboard') updateHomeView();
+      if (targetId === 'menu-datasampel') updateSampelView();
+      if (targetId === 'menu-parameter') updateParamView(true);
+    }
+
+    window.onload = function() {
+      google.script.run.withSuccessHandler(onDataLoaded).getData();
+    };
+
+    function onDataLoaded(response) {
+      document.getElementById('loadingOverlay').style.display = 'none';
+      if (!response.success) { alert("Gagal memuat data: " + response.message); return; }
+      
+      response.data.forEach(item => {
+        if (item.compartment) {
+          let compUpper = item.compartment.toString().toUpperCase();
+          if (compUpper.includes("TRANSMIS")) item.compartment = "TRANSMISSION";
+          else if (compUpper.includes("DIFF")) item.compartment = "DIFFERENTIAL";
+          else if (compUpper.includes("ENGI")) item.compartment = "ENGINE";
+        }
+      });
+
+      allData = response.data;
+      
+      updateHomeView();
+      updateSampelView();
+      updateParamView(true);
+    }
+
+    function isStatusMatch(itemStatus, targetStatusArray) {
+      let statusRaw = (itemStatus || '').toString().toUpperCase();
+      return targetStatusArray.some(keyword => statusRaw.includes(keyword));
+    }
+
+    function formatRupiah(angka) {
+      return "Rp " + angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+    
+    function parseLabVal(str) {
+      if (str === null || str === undefined || str === '' || str === '-' || str === 'n/a') return null;
+      let match = str.toString().trim().replace(/,/g, '.').match(/[-+]?\d*\.?\d+/);
+      return match ? parseFloat(match[0]) : null;
+    }
+
+    function fillSelectDropdownNoAll(elementId, setValues, currentValue) {
+      let select = document.getElementById(elementId);
+      if (!select) return;
+      select.innerHTML = "";
+      let sortedValues = Array.from(setValues).filter(val => val && val !== '-' && val !== 'Belum Ada Tahun').sort();
+      sortedValues.forEach(val => {
+        let opt = document.createElement('option');
+        opt.value = val; opt.textContent = val;
+        select.appendChild(opt);
+      });
+      if (sortedValues.length > 0) {
+        if (sortedValues.includes(currentValue)) { select.value = currentValue; } 
+        else { select.value = sortedValues[0]; }
+      }
+    }
+
+    // Fungsi Khusus Dropdown Home (Tambahan "Semua Perusahaan")
+    function fillSelectDropdownWithAll(elementId, setValues, currentValue, textAll) {
+      let select = document.getElementById(elementId);
+      if (!select) return;
+      select.innerHTML = "";
+      
+      let optAll = document.createElement('option');
+      optAll.value = "";
+      optAll.textContent = textAll;
+      select.appendChild(optAll);
+
+      let sortedValues = Array.from(setValues).filter(val => val && val !== '-' && val !== 'Belum Ada Tahun').sort();
+      sortedValues.forEach(val => {
+        let opt = document.createElement('option');
+        opt.value = val; opt.textContent = val;
+        select.appendChild(opt);
+      });
+      select.value = currentValue || "";
+    }
+    
+    function fillCheckboxes(containerId, setValues, checkedArray, cssClass) {
+      let container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = "";
+      let sortedValues = Array.from(setValues).filter(val => val && val !== '-').sort();
+      if(sortedValues.length === 0) { container.innerHTML = '<span class="text-muted small">Tidak ada unit...</span>'; return; }
+
+      sortedValues.forEach((val, idx) => {
+        let div = document.createElement('div');
+        div.className = 'form-check mb-1';
+        let input = document.createElement('input');
+        input.className = `form-check-input ${cssClass}`;
+        input.type = 'checkbox';
+        input.value = val;
+        input.id = `${containerId}_chk_${idx}`;
+        input.onchange = () => updateParamView(false); 
+        if (checkedArray.includes(val)) input.checked = true;
+
+        let label = document.createElement('label');
+        label.className = 'form-check-label small fw-bold text-dark';
+        label.htmlFor = input.id;
+        label.textContent = val;
+        div.appendChild(input); div.appendChild(label); container.appendChild(div);
+      });
+    }
+
+    // ==========================================
+    // LOGIC MENU HOME (MENDUKUNG 2 MODE SEKALIGUS)
+    // ==========================================
+    function updateHomeView() {
+      // 1. Tentukan sumber Lab (Tergantung Mode Aktif)
+      let selectedLab = 'All';
+      if (currentAppMode === 'SALES') {
+        selectedLab = document.getElementById('homeSalesFilterLab').value || 'All';
+      } else {
+        selectedLab = document.getElementById('homeLabAll').checked ? 'All' : 
+                     (document.getElementById('homeLabTeko').checked ? 'Tekenomiks' : 'Petrolab');
+      }
+
+      // 2. Filter data berdasarkan Lab
+      let labFiltered = allData.filter(item => (selectedLab === 'All' || item.labSource === selectedLab));
+
+      // 3. Tentukan Filter PT (Hanya berlaku di Mode Sales)
+      let uniqueTotalCompanies = new Set(labFiltered.map(i => i.customer)).size;
+      let selCust = '';
+      
+      if (currentAppMode === 'SALES') {
+        selCust = document.getElementById('homeSalesFilterCustomer').value || '';
+        fillSelectDropdownWithAll('homeSalesFilterCustomer', new Set(labFiltered.map(i => i.customer)), selCust, "ALL COMPANIES (" + uniqueTotalCompanies + " PT)");
+        selCust = document.getElementById('homeSalesFilterCustomer').value || '';
+      }
+
+      // 4. Final filter data (Jika teknikal, selCust kosong sehingga nampil semua PT)
+      let filtered = labFiltered.filter(item => selCust === "" || item.customer === selCust);
+
+      let total = filtered.length;
+      let n = filtered.filter(i => isStatusMatch(i.status, ['NORMAL'])).length;
+      let w = filtered.filter(i => isStatusMatch(i.status, ['WATCH', 'WARNING', 'CAUTION'])).length;
+      let p = filtered.filter(i => isStatusMatch(i.status, ['PROBLEM', 'ACTION', 'SEVERE', 'CRITICAL'])).length;
+
+      // UPDATE KPI SALES
+      let displayCompanies = (currentAppMode === 'SALES' && selCust === "") ? uniqueTotalCompanies : 1;
+      document.getElementById('homeSalesKpiTotal').innerText = total;
+      document.getElementById('homeSalesKpiCompanies').innerText = displayCompanies;
+      let grandTotalCost = filtered.reduce((sum, item) => sum + (parseFloat(item.cost || item.price) || 0), 0);
+      document.getElementById('homeSalesTotalCost').innerText = formatRupiah(grandTotalCost);
+
+      // UPDATE KPI TEKNIS
+      document.getElementById('homeKpiTotal').innerText = total;
+      document.getElementById('homeKpiNormal').innerText = n;
+      document.getElementById('homeKpiWatch').innerText = w;
+      document.getElementById('homeKpiProblem').innerText = p;
+      document.getElementById('homeTotalCostCard').innerText = formatRupiah(grandTotalCost);
+
+      let validTotal = n + w + p; 
+      document.getElementById('pctNormal').innerText = (validTotal > 0 ? parseFloat(((n / validTotal) * 100).toFixed(1)) : 0) + '%';
+      document.getElementById('countNormal').innerText = n + ' Unit';
+      document.getElementById('pctWatch').innerText = (validTotal > 0 ? parseFloat(((w / validTotal) * 100).toFixed(1)) : 0) + '%';
+      document.getElementById('countWatch').innerText = w + ' Unit';
+      document.getElementById('pctProblem').innerText = (validTotal > 0 ? parseFloat(((p / validTotal) * 100).toFixed(1)) : 0) + '%';
+      document.getElementById('countProblem').innerText = p + ' Unit';
+
+      // TABEL
+      let tbodySampel = document.getElementById('homeDataTableBody');
+      tbodySampel.innerHTML = "";
+      if (filtered.length === 0) {
+        tbodySampel.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data.</td></tr>`;
+      } else {
+        filtered.forEach(item => {
+          let badgeClass = isStatusMatch(item.status, ['NORMAL']) ? 'bg-success' : (isStatusMatch(item.status, ['WATCH', 'WARNING']) ? 'bg-warning text-dark' : (isStatusMatch(item.status, ['PROBLEM', 'ACTION', 'CRITICAL']) ? 'bg-danger' : 'bg-secondary'));
+          let regDisplay = item.linkPDF ? `<a href="${item.linkPDF}" target="_blank" class="fw-bold text-decoration-none">${item.noReg}</a>` : item.noReg;
+          
+          tbodySampel.innerHTML += `<tr>
+            <td>${item.customer}</td>
+            <td>${regDisplay}</td>
+            <td>${item.machineId}</td>
+            <td>${item.groupKey}</td>
+            <td>${item.compartment}</td>
+            <td>${item.lubeName}</td>
+            <td><span class="badge bg-light text-dark border">${item.labSource}</span></td>
+            <td class="tech-only"><span class="badge ${badgeClass}">${item.status || 'No Data'}</span></td>
+          </tr>`;
+        });
+      }
+
+      // GRAFIK
+      if(currentAppMode === 'TECHNICAL') {
+        let ctx = document.getElementById('homeBarChart').getContext('2d');
+        if (homeBarChartObj) homeBarChartObj.destroy();
+        homeBarChartObj = new Chart(ctx, {
+          type: 'bar',
+          data: { labels: ['NORMAL', 'WATCH', 'PROBLEM'], datasets: [{ data: [n, w, p], backgroundColor: ['#198754', '#ffc107', '#dc3545'], borderRadius: 8, barThickness: 60 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }, y: { beginAtZero: true, grid: { color: '#f1f3f5' } } } }
+        });
+      }
+    }
+
+    // ==========================================
+    // LOGIC MENU DATA SAMPEL
+    // ==========================================
+    function updateSampelView() {
+      if(currentAppMode === 'SALES') return; 
+      
+      let selectedLab = document.getElementById('sampelLabTeko').checked ? 'Tekenomiks' : 'Petrolab';
+      let dataLab = allData.filter(i => i.labSource === selectedLab);
+
+      let selCust = document.getElementById('sampelFilterCustomer').value || '';
+      fillSelectDropdownNoAll('sampelFilterCustomer', new Set(dataLab.map(i => i.customer)), selCust);
+      selCust = document.getElementById('sampelFilterCustomer').value || '';
+
+      let selSeries = document.getElementById('sampelFilterSeries').value || '';
+      fillSelectDropdownNoAll('sampelFilterSeries', new Set(dataLab.filter(i => !selCust || i.customer === selCust).map(i => i.groupKey)), selSeries);
+      selSeries = document.getElementById('sampelFilterSeries').value || '';
+
+      let selComp = document.getElementById('sampelFilterCompartment').value || '';
+      fillSelectDropdownNoAll('sampelFilterCompartment', new Set(dataLab.filter(i => (!selCust || i.customer === selCust) && (!selSeries || i.groupKey === selSeries)).map(i => i.compartment)), selComp);
+      selComp = document.getElementById('sampelFilterCompartment').value || '';
+
+      let selYear = document.getElementById('sampelFilterYear').value || '';
+      fillSelectDropdownNoAll('sampelFilterYear', new Set(dataLab.filter(i => (!selCust || i.customer === selCust) && (!selSeries || i.groupKey === selSeries) && (!selComp || i.compartment === selComp)).map(i => i.year)), selYear);
+      selYear = document.getElementById('sampelFilterYear').value || '';
+
+      let filtered = dataLab.filter(item => (!selCust || item.customer === selCust) && (!selSeries || item.groupKey === selSeries) && (!selComp || item.compartment === selComp) && (!selYear || item.year === selYear));
+
+      document.getElementById('sampelKpiTotal').innerText = filtered.length;
+      document.getElementById('sampelKpiNormal').innerText = filtered.filter(i => isStatusMatch(i.status, ['NORMAL'])).length;
+      document.getElementById('sampelKpiWatch').innerText = filtered.filter(i => isStatusMatch(i.status, ['WATCH', 'WARNING', 'CAUTION'])).length;
+      document.getElementById('sampelKpiProblem').innerText = filtered.filter(i => isStatusMatch(i.status, ['PROBLEM', 'ACTION', 'SEVERE', 'CRITICAL'])).length;
+      document.getElementById('sampelTotalCostCard').innerText = formatRupiah(filtered.reduce((sum, item) => sum + (parseFloat(item.cost || item.price) || 0), 0));
+
+      let labels = filtered.map(i => i.noReg || '-');
+      let pointsData = filtered.map(i => isStatusMatch(i.status, ['NORMAL']) ? 3 : (isStatusMatch(i.status, ['WATCH', 'WARNING']) ? 2 : (isStatusMatch(i.status, ['PROBLEM', 'ACTION', 'CRITICAL']) ? 1 : 0)));
+
+      let ctx = document.getElementById('sampelLineChart').getContext('2d');
+      if (sampelLineChartObj) sampelLineChartObj.destroy();
+      sampelLineChartObj = new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: [{ data: pointsData, borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.08)', borderWidth: 2.5, fill: true, tension: 0.15, spanGaps: true, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: function(context) { let val = context.raw; return val === 3 ? '#198754' : (val === 2 ? '#ffc107' : (val === 1 ? '#dc3545' : '#6c757d')); } }] },
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 15 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { let val = context.raw; return 'Status: ' + (val === 3 ? 'Normal' : (val === 2 ? 'Watch' : (val === 1 ? 'Problem' : 'No Data'))); } } } }, scales: { x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } }, grid: { display: false } }, y: { min: -0.2, max: 3.3, ticks: { stepSize: 1, font: { weight: 'bold' }, callback: function(value) { if (value === 3) return 'Normal'; if (value === 2) return 'Watch'; if (value === 1) return 'Problem'; if (value === 0) return 'No Data'; return ''; } }, grid: { color: function(context) { return [0, 1, 2, 3].includes(context.tick.value) ? 'rgba(0, 0, 0, 0.1)' : 'transparent'; } } } } }
+      });
+    }
+
+    // ==========================================
+    // LOGIC MENU LAB PARAMETER
+    // ==========================================
+    function updateParamView(rebuildCascade = false) {
+      if(currentAppMode === 'SALES') return;
+
+      let selectedLab = document.getElementById('paramLabTeko').checked ? 'Tekenomiks' : 'Petrolab';
+      let dataLab = allData.filter(i => i.labSource === selectedLab);
+
+      let selCust = document.getElementById('paramFilterCustomer').value || '';
+      fillSelectDropdownNoAll('paramFilterCustomer', new Set(dataLab.map(i => i.customer)), selCust);
+      selCust = document.getElementById('paramFilterCustomer').value || '';
+
+      let selComp = document.getElementById('paramFilterCompartment').value || '';
+      fillSelectDropdownNoAll('paramFilterCompartment', new Set(dataLab.filter(i => !selCust || i.customer === selCust).map(i => i.compartment)), selComp);
+      selComp = document.getElementById('paramFilterCompartment').value || '';
+
+      let selYear = document.getElementById('paramFilterYear').value || '';
+      fillSelectDropdownNoAll('paramFilterYear', new Set(dataLab.filter(i => (!selCust || i.customer === selCust) && (!selComp || i.compartment === selComp)).map(i => i.year)), selYear);
+      selYear = document.getElementById('paramFilterYear').value || '';
+
+      let isEngine = !selComp || selComp.toUpperCase().includes("ENGINE");
+      let testContainer = document.getElementById('paramTestChecklist');
+      
+      let selectedRadio = document.querySelector('input[name="paramUjiRadio"]:checked');
+      let currentlySelectedParam = selectedRadio ? selectedRadio.value : 'fe';
+      if (currentlySelectedParam === 'tan') currentlySelectedParam = 'tbn'; 
+      if (currentlySelectedParam === 'visc40') currentlySelectedParam = 'visc'; 
+
+      let tbnTanLabel = isEngine ? 'TBN' : 'TAN';
+      let viscLabel = isEngine ? 'Visc@100' : 'Visc@40';
+
+      let checklistHTML = `
+        <div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="fe" id="chk_fe" onchange="updateParamView(false)" ${currentlySelectedParam==='fe'?'checked':''}><label class="form-check-label" for="chk_fe">Fe (ppm)</label></div>
+        <div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="tbn" id="chk_tbntan" onchange="updateParamView(false)" ${currentlySelectedParam==='tbn'?'checked':''}><label class="form-check-label" for="chk_tbntan">${tbnTanLabel}</label></div>
+        <div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="visc" id="chk_visc" onchange="updateParamView(false)" ${currentlySelectedParam==='visc'?'checked':''}><label class="form-check-label" for="chk_visc">${viscLabel}</label></div>
+        <div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="oxidation" id="chk_oxidation" onchange="updateParamView(false)" ${currentlySelectedParam==='oxidation'?'checked':''}><label class="form-check-label" for="chk_oxidation">Oxidation</label></div>
+        <div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="nitration" id="chk_nitration" onchange="updateParamView(false)" ${currentlySelectedParam==='nitration'?'checked':''}><label class="form-check-label" for="chk_nitration">Nitration</label></div>
+      `;
+      if (isEngine) checklistHTML += `<div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="fuelDilution" id="chk_fuelDilution" onchange="updateParamView(false)" ${currentlySelectedParam==='fuelDilution'?'checked':''}><label class="form-check-label" for="chk_fuelDilution">Fuel Dilution</label></div>`;
+      checklistHTML += `<div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="waterContent" id="chk_water" onchange="updateParamView(false)" ${currentlySelectedParam==='waterContent'?'checked':''}><label class="form-check-label" for="chk_water">Water Content</label></div>`;
+      if (isEngine) checklistHTML += `<div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="soot" id="chk_soot" onchange="updateParamView(false)" ${currentlySelectedParam==='soot'?'checked':''}><label class="form-check-label" for="chk_soot">Soot / Insoluble</label></div>`;
+      checklistHTML += `<div class="form-check mb-1"><input class="form-check-input param-check" type="radio" name="paramUjiRadio" value="debris" id="chk_debris" onchange="updateParamView(false)" ${currentlySelectedParam==='debris'?'checked':''}><label class="form-check-label" for="chk_debris">Debris / PQ</label></div>`;
+      
+      testContainer.innerHTML = checklistHTML;
+
+      let previouslyCheckedUnits = Array.from(document.querySelectorAll('.series-check:checked')).map(cb => cb.value);
+      if (rebuildCascade) {
+        let seriesSet = new Set(dataLab.filter(i => (!selCust || i.customer === selCust) && (!selComp || i.compartment === selComp) && (!selYear || i.year === selYear)).map(i => i.groupKey));
+        fillCheckboxes('paramCheckboxSeries', seriesSet, previouslyCheckedUnits, 'series-check');
+      }
+
+      let checkedSeries = Array.from(document.querySelectorAll('.series-check:checked')).map(cb => cb.value);
+      let filtered = dataLab.filter(item => (!selCust || item.customer === selCust) && (!selComp || item.compartment === selComp) && (!selYear || item.year === selYear) && (checkedSeries.length === 0 || checkedSeries.includes(item.groupKey)));
+
+      document.getElementById('paramKpiTotal').innerText = filtered.length;
+      document.getElementById('paramKpiNormal').innerText = filtered.filter(i => isStatusMatch(i.status, ['NORMAL'])).length;
+      document.getElementById('paramKpiWatch').innerText = filtered.filter(i => isStatusMatch(i.status, ['WATCH', 'WARNING'])).length;
+      document.getElementById('paramKpiProblem').innerText = filtered.filter(i => isStatusMatch(i.status, ['PROBLEM', 'ACTION', 'CRITICAL'])).length;
+
+      let unitsToDraw = checkedSeries.length === 0 ? [...new Set(filtered.map(i => i.groupKey))] : checkedSeries;
+      renderParamLineChart(filtered, unitsToDraw);
+    }
+
+    function renderParamLineChart(data, checkedSeries) {
+      let selectedParamRadio = document.querySelector('input[name="paramUjiRadio"]:checked');
+      let paramKey = selectedParamRadio ? selectedParamRadio.value : 'fe'; 
+      let paramNameText = selectedParamRadio ? selectedParamRadio.nextElementSibling.innerText : 'Parameter';
+
+      let maxHour = 0;
+      data.forEach(i => { let lube = i.lubeName ? i.lubeName.toUpperCase() : ""; if (lube.includes("BARDAHL")) { let h = parseFloat(i.oilHour); if (!isNaN(h) && h > maxHour) maxHour = h; } });
+      let maxXBucket = Math.ceil(maxHour / 5000) * 5000;
+      if (maxXBucket < 15000 || isNaN(maxXBucket)) maxXBucket = 15000; 
+
+      let datasets = [];
+      let colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14', '#20c997', '#0dcaf0', '#d63384'];
+      let monitorLimitVal = null, badLimitVal = null;
+
+      for (let item of data) {
+        let mVal = item[paramKey + 'Monitor'], bVal = item[paramKey + 'Bad'];
+        if (monitorLimitVal === null && mVal !== undefined && mVal !== '' && mVal !== '-') monitorLimitVal = parseLabVal(mVal);
+        if (badLimitVal === null && bVal !== undefined && bVal !== '' && bVal !== '-') badLimitVal = parseLabVal(bVal);
+        if (monitorLimitVal !== null && badLimitVal !== null) break;
+      }
+
+      let allDataValues = [];
+      checkedSeries.forEach((seriesName, index) => {
+          let unitColor = colors[index % colors.length];
+          let seriesData = data.filter(i => i.groupKey === seriesName);
+          let chartPoints = [];
+          seriesData.forEach(i => {
+              let lube = i.lubeName ? i.lubeName.toUpperCase() : "";
+              let h = parseFloat(i.oilHour);
+              let xVal = (lube.includes("BARDAHL")) ? (!isNaN(h) && h > 0 ? h : 150) : 0;
+              let yVal = parseLabVal(i[paramKey]);
+              if (yVal !== null && !isNaN(yVal)) { chartPoints.push({ x: xVal, y: yVal }); allDataValues.push(yVal); }
+          });
+          chartPoints.sort((a, b) => a.x - b.x);
+          if (chartPoints.length > 0) datasets.push({ label: seriesName, data: chartPoints, borderColor: unitColor, backgroundColor: unitColor, borderWidth: 2.5, fill: false, tension: 0.1, spanGaps: true, pointRadius: 4, pointHoverRadius: 6 });
+      });
+
+      if (monitorLimitVal !== null && !isNaN(monitorLimitVal)) { datasets.push({ label: 'Limit Monitor (Warning)', data: [{x: 0, y: monitorLimitVal}, {x: maxXBucket, y: monitorLimitVal}], borderColor: '#ffc107', backgroundColor: '#ffc107', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, filter: false, order: 99 }); allDataValues.push(monitorLimitVal); }
+      if (badLimitVal !== null && !isNaN(badLimitVal)) { datasets.push({ label: 'Limit Bad (Danger)', data: [{x: 0, y: badLimitVal}, {x: maxXBucket, y: badLimitVal}], borderColor: '#dc3545', backgroundColor: '#dc3545', borderWidth: 2, borderDash: [3, 3], pointRadius: 0, filter: false, order: 100 }); allDataValues.push(badLimitVal); }
+
+      let maxDataVal = allDataValues.length > 0 ? Math.max(...allDataValues) : 10;
+      let highestLimit = badLimitVal !== null ? badLimitVal : (monitorLimitVal !== null ? monitorLimitVal : maxDataVal);
+      if (highestLimit <= 0) highestLimit = 2;
+      let suggestedYMax = maxDataVal <= highestLimit ? highestLimit * 1.05 : undefined; 
+      let customStepSize = highestLimit <= 5 ? 0.5 : undefined;
+
+      let ctx = document.getElementById('paramLineChart').getContext('2d');
+      if (paramLineChartObj) paramLineChartObj.destroy();
+      paramLineChartObj = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { 
+              title: { display: true, text: paramNameText + ' (Trend & Threshold Limits)', font: { size: 16, weight: 'bold', family: "'Helvetica Neue Bold', sans-serif" }, color: '#111', padding: { top: 0, bottom: 15 } },
+              legend: { display: true, position: 'bottom', labels: { boxWidth: 15, font: {size: 11} } },
+              tooltip: { callbacks: { title: function(context) { return context[0].dataset.label + ': ' + context[0].parsed.y; }, label: function(context) { let xVal = context.parsed.x; let textHour = (xVal === 0) ? 'Existing' : ((xVal === 150) ? 'No Data (0)' : xVal); return 'Oil Hour: ' + textHour; } } }
+          },
+          scales: {
+            x: { type: 'linear', min: 0, max: maxXBucket, title: { display: true, text: 'Actual Usage Interval', font: { weight: 'bold' } }, grid: { display: false }, ticks: { stepSize: 5000, font: { weight: 'bold' }, callback: function(value, index, values) { if (value === 0) return 'Existing'; if (value % 5000 === 0) return value; return null; } } },
+            y: { beginAtZero: true, max: suggestedYMax, grid: { color: '#f1f3f5' }, ticks: { stepSize: customStepSize } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
